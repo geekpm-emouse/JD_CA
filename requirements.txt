@@ -1,0 +1,2 @@
+requests==2.22.0
+xlwings==0.15.10
