@@ -8,18 +8,19 @@ import time
 import xlwings as xw
 
 s = requests.session()
-shop_id = '47831955013'  # 抓取的商品ID
+product_url = input('请粘贴需要抓取的商品详情页地址：')
+product_id_find = re.compile('https://item.jd.com/(.*?).html').findall(product_url)
+product_id = product_id_find[0]
 
-start_shop_page = 0  # 起始抓取页码,0是第一页
-
+start_content_page = 0  # 起始抓取页码,0是第一页
 
 time_now = datetime.datetime.now().strftime('%Y%m%d%H%M')
-save_file_name = './' + shop_id + '京东评价' + time_now
+save_file_name = './' + product_id + '京东评价' + time_now
 # 抓取当前评论，可能是合并多个SKU的评论
 url = 'https://sclub.jd.com/comment/productPageComments.action'
 
 # 抓取当前SKU评论，相当于京东中勾选只看当前商品评论
-url_sku ='https://club.jd.com/comment/skuProductPageComments.action'
+url_sku = 'https://club.jd.com/comment/skuProductPageComments.action'
 
 headers = {
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 '
@@ -37,9 +38,9 @@ data = {
     'fold': 1
 }
 
-data['productId'] = shop_id
-data['page'] = start_shop_page
-headers['referer'] = 'https://item.jd.com/' + shop_id + '.html'
+data['productId'] = product_id
+data['page'] = start_content_page
+headers['referer'] = 'https://item.jd.com/' + product_id + '.html'
 
 # 读取模板，Excel模板
 # app = xw.App(visible=False, add_book=False)
@@ -50,7 +51,8 @@ sheet_summary = wb.sheets['评价概况']
 # 抓取评价概要信息
 t = s.get(url, params=data, headers=headers).text
 j = json.loads(t)
-shop_link = 'https://item.jd.com/%s.html' % shop_id
+shop_link = 'https://item.jd.com/%s.html' % product_id
+print('开始抓取：'+ shop_link)
 sheet_summary.range('B1').add_hyperlink(shop_link, shop_link, '提示：点击访问商品详情页')
 sheet_summary.range('B2').value = j['productCommentSummary']['goodRate']
 sheet_summary.range('B3').value = j['productCommentSummary']['commentCount']
@@ -121,6 +123,8 @@ for sheet_num in sheets_array:
             print('正在抓取页面:' + str(data['page']) + '总页面：' + str(maxPage))
             data['page'] += 1
     #         # time.sleep(1)
+
+sheet_summary.range('B1').add_hyperlink(shop_link, referenceName, '提示：点击访问商品详情页')
 wb.sheets['评价概况'].activate()
 wb.save(save_file_name)
 # wb.close()
