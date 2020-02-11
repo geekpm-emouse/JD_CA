@@ -17,10 +17,13 @@ start_content_page = 0  # 起始抓取页码,0是第一页
 time_now = datetime.datetime.now().strftime('%Y%m%d%H%M')
 save_file_name = './' + product_id + '京东评价' + time_now
 # 抓取当前评论，可能是合并多个SKU的评论
-url = 'https://sclub.jd.com/comment/productPageComments.action'
+url_all = 'https://sclub.jd.com/comment/productPageComments.action'
 
 # 抓取当前SKU评论，相当于京东中勾选只看当前商品评论
 url_sku = 'https://club.jd.com/comment/skuProductPageComments.action'
+
+#  只抓取当前SKU评论
+url = url_sku
 
 headers = {
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 '
@@ -52,7 +55,7 @@ sheet_summary = wb.sheets['评价概况']
 t = s.get(url, params=data, headers=headers).text
 j = json.loads(t)
 shop_link = 'https://item.jd.com/%s.html' % product_id
-print('开始抓取：'+ shop_link)
+print('开始抓取：' + shop_link)
 sheet_summary.range('B1').add_hyperlink(shop_link, shop_link, '提示：点击访问商品详情页')
 sheet_summary.range('B2').value = j['productCommentSummary']['goodRate']
 sheet_summary.range('B3').value = j['productCommentSummary']['commentCount']
@@ -92,7 +95,7 @@ for sheet_num in sheets_array:
             continue
         flag = re.search('content', t)
         print(flag)
-        if flag == None:
+        if flag is None:
             last_shop_page = data['page']
             print("抓取停止，最后页码为：" + str(last_shop_page))
             try_time -= 1
@@ -112,7 +115,11 @@ for sheet_num in sheets_array:
                 replyCount = comment['replyCount']
                 content = comment['content']  # 评论内容
                 referenceName = comment['referenceName']
-                productColor = comment['productColor']
+                try:
+                    productColor = comment['productColor']  #部分商品没有颜色属性
+                except Exception as e:
+                    productColor = ''
+                    continue
 
                 print('{}  {}\n{}\n{}\n'.format(nickname, creationTime, content, referenceTime))
                 comment_range = 'A' + str(line_num)
@@ -125,6 +132,53 @@ for sheet_num in sheets_array:
     #         # time.sleep(1)
 
 sheet_summary.range('B1').add_hyperlink(shop_link, referenceName, '提示：点击访问商品详情页')
+print('开始抓取用户咨询')
+sheet_qa = wb.sheets['用户咨询']
+
+qa_page = 1
+line_num = 1
+
+qa_url = 'https://question.jd.com/question/getQuestionAnswerList.action?page=%s&productId=%s' % (qa_page, product_id)
+s = requests.session()
+t = s.get(qa_url).text
+j = json.loads(t)
+item_num = j['totalItem'] // 10 + 1
+print(item_num)
+while qa_page <= item_num:
+    qa_url = 'https://question.jd.com/question/getQuestionAnswerList.action?page=%s&productId=%s' % (
+        qa_page, product_id)
+    try:
+        s = requests.session()
+        t = s.get(qa_url).text
+        j = json.loads(t)
+        questionList = j['questionList']
+    except Exception as e:
+        print('错误')
+        print(e)
+        continue
+    qa_page += 1
+    for qa_num in questionList:
+        content = qa_num['content']
+        created_time = qa_num['created']
+        line_num += 1
+        print(content)
+
+        create_time_line = 'A' + str(line_num)
+        sheet_qa.range(create_time_line).value = created_time
+
+        qa_content_line = 'B' + str(line_num)
+        sheet_qa.range(qa_content_line).value = content
+
+        answerList = qa_num['answerList']
+        answer_column = 'C'
+        for answer in answerList:
+            answer_content = answer['content']
+            answer_range = answer_column + str(line_num)
+            sheet_qa.range(answer_range).value = answer_content
+            print(str(qa_page) + '回答：' + answer_content)
+            answer_column = chr(ord(answer_column) + 1)
+            if answer_column == 'z':
+                break
 wb.sheets['评价概况'].activate()
 wb.save(save_file_name)
 # wb.close()
